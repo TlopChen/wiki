@@ -1,6 +1,6 @@
 # 家庭网络总览
 
-2026-08-29 基于**全量配置导出**（ROS `/export show-sensitive` 781KB + AR `display current-configuration`）逐项核实，原始配置归档于 VPS `/root/config-backups/2026-08-29/`（含密钥，勿外传）。规则管线见 [ROS 规则管线](ros-rules-pipeline.md)。
+2026-08-29 基于全量配置导出逐项核实（原始配置含密钥，已另行离线归档，不进本仓库）。规则管线见 [ROS 规则管线](ros-rules-pipeline.md)。
 
 ## 拓扑总览
 
