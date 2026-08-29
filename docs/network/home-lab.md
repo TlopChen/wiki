@@ -60,7 +60,7 @@
 
 ## 已知问题与待办
 
-- [ ] **jp-wg 默认路由 INACTIVE（当前双隧道负载均衡实际全走 sstp）**：check-gateway ping 1.1.1.1 经 wg-home 不通（隧道握手正常、rx 11.7GiB），疑日本侧不放行转发 ICMP；可把锚点换成 `1.0.0.1` 或改用递归到 192.168.30.2 自身
+- [x] **jp-wg 默认路由"INACTIVE"疑案已澄清（2026-08-29 排查，非故障）**：jp-wg 主路由 `gateway=1.1.1.1 check-gateway=ping` 与 jp-sstp 的 `8.8.8.8` 结构对称、递归均正常（`immediate-gw=192.168.30.2%wg-home`）。实测偶发 INACTIVE 的根因是 wg-port scheduler 每 1 分钟跳端口（防封设计）触发 WG 重握手，重握手窗口内 check-gateway 对 1.1.1.1 两连败短暂撤路由，握手恢复后两连胜自动回切 Active——属设计预期的抖动，无需改动；缺省状态下主路由 Active、fallback 待命。
 - [ ] `proxy-domain.rsc`（5197 条）未导入，ROS FWD 仍是旧手工版 4085 条
 - [ ] cn-unicom.rsc / cn-cernet.rsc 未导入（CU/CC 空缺）
 - [ ] 192.168.2.2 服务器（疑 OxiDNS 所在）未纳入巡检
