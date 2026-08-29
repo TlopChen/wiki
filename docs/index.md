@@ -10,5 +10,5 @@
 
 ## 目录
 
-- [网络运维](network/home-lab.md) —— 家庭网络架构、ROS 规则管线
+- [网络运维](network/home-lab.md) —— 家庭网络架构、ROS 规则管线、隧道、DNS、坑手册
 - [GitHub 学习](github/git-basics.md) —— Git 基础、Pages、Actions

@@ -29,7 +29,11 @@ nav:
   - 首页: index.md
   - 网络运维:
       - 家庭网络总览: network/home-lab.md
+      - 双线出口与分流: network/dual-wan-routing.md
+      - 隧道速查: network/tunnels.md
+      - DNS 防污染: network/dns-architecture.md
       - ROS 规则管线: network/ros-rules-pipeline.md
+      - 坑与排障手册: network/pitfalls.md
   - GitHub 学习:
       - Git 基础操作: github/git-basics.md
       - Pages 与 Actions: github/pages-actions.md
