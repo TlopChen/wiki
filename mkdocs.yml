@@ -1,0 +1,35 @@
+site_name: TlopChen 知识库
+site_description: 网络运维 / RouterOS / GitHub 学习笔记
+site_url: https://tlopchen.github.io/wiki
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: 切换到暗色
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: 切换到亮色
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+nav:
+  - 首页: index.md
+  - 网络运维:
+      - 家庭网络总览: network/home-lab.md
+      - ROS 规则管线: network/ros-rules-pipeline.md
+  - GitHub 学习:
+      - Git 基础操作: github/git-basics.md
+      - Pages 与 Actions: github/pages-actions.md
