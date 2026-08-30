@@ -1,6 +1,6 @@
 # 家庭网络总览
 
-2026-08-29 基于全量配置导出逐项核实（原始配置含密钥，已另行离线归档，不进本仓库）。规则管线见 [ROS 规则管线](ros-rules-pipeline.md)。
+2026-08-29 基于**全量配置导出**（ROS `/export show-sensitive` 781KB + AR `display current-configuration`）逐项核实，原始配置归档于 VPS `/root/config-backups/2026-08-29/`（含密钥，勿外传）。规则管线见 [ROS 规则管线](ros-rules-pipeline.md)。
 
 ## 拓扑总览
 
@@ -44,23 +44,26 @@
 
 ## DNS 实况与分流闭环
 
-1. LAN 客户端 → ROS DNS：普通域名 → 192.168.1.1（AR）→ ISP；**代理域名（FWD 4085 条）→ 转发器 "DNS"（日本侧 DNS）**，全部 `match-subdomain=yes`、不带 address-list
-2. DNS 侧（疑 192.168.2.2 上的 OxiDNS 及/或日本节点）观察解析，把得到的 IP **动态写入 ROS `blacklist` 地址表**（当前 1357 条动态 + 4 条静态，`address-list-extra-time=1w` 延长驻留）
+1. LAN 客户端 → ROS DNS：普通域名 → 192.168.1.1（AR）→ ISP；**代理域名（FWD 5197 条，2026-08-29 起为管线单文件双层版）→ 转发器 "DNS"（日本侧 DNS）**，全部 `match-subdomain=yes`、不带 address-list
+2. ROS 原生机制完成"感知"：FWD 静态条目带 `address-list=blacklist` 参数，**域名一旦被解析，得到的 IP 自动作为动态条目写入 blacklist**（`address-list-extra-time=1w` 延长驻留，当前 ~1476 条动态）——无需任何外部 DNS，纯 RouterOS 内建能力
 3. mangle：从 ether6 进入、目的在 `blacklist` 的新连接按 PCC（both-addresses-and-ports）2/0→`jp-wg`、2/1→`jp-sstp`
 4. 策略路由出日本隧道；同时这些网段经 BGP（lo-wg/lo-sstp）宣告给 AR，AR 用 route-policy 重写下一跳实现**双线择优出境**
 
-## 地址表实测（配置导出修正版；此前 print 因换行折行统计偏小）
+## 地址表现状（2026-08-29 管线版已全部导入 ROS）
 
 | 列表 | 条数 | 说明 |
 |---|---|---|
-| CN | 5615 | 中国大陆（静态） |
-| CT / CM | 3084 / 1517 | 电信 / 移动（= BGP 宣告数，AR PrefRcv 完全一致） |
-| blacklist | 4 静态 + 1357 动态 | TG/Meta 网段 + DNS 动态注入 |
+| CN | 6223 | 中国大陆（管线整表重建） |
+| CT / CM | 3081 / 1493 | 电信 / 移动（管线整表重建，= BGP 宣告数） |
+| CU / CC | 1907 / 396 | 联通 / 教育网（新建） |
+| blacklist | 18 静态 + ~1476 动态 | TG/Meta/Twitter/MikroTik 静态（ros-rules-auto）+ DNS 动态注入 |
 | not_global / bad_* / no_forward | 8/7/4 | defconf RFC6890 保留段 |
+
+> 导出时旧值为 CN 5615 / CT 3084 / CM 1517 / blacklist 4 静态（仅 TG/Meta），已被管线版本整表替换。
 
 ## 已知问题与待办
 
 - ~~jp-wg 默认路由间歇翻动~~ **确认为设计内行为，无问题**（2026-08-29 用户确认）：wg-port 每分钟改写 endpoint-port 的瞬间 check-gateway 探测短暂失败、路由翻到 fallback，握手恢复后自愈；已有连接靠 connection-mark 不受影响。无需修复
-- [ ] `proxy-domain.rsc`（5197 条）未导入，ROS FWD 仍是旧手工版 4085 条
-- [ ] cn-unicom.rsc / cn-cernet.rsc 未导入（CU/CC 空缺）
+- [x] proxy-domain.rsc（5197 条）已导入，ROS DNS 静态 4085 → 5197
+- [x] cn-unicom / cn-cernet 已导入（CU=1907 / CC=396），CN/CT/CM 已按管线数据整表重建
 - [ ] 192.168.2.2 服务器（疑 OxiDNS 所在）未纳入巡检
