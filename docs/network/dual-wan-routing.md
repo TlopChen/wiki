@@ -1,6 +1,6 @@
 # 双线出口与分流(BGP 黑洞通告 + mangle PBR)
 
-2026-08-21 实测版。SOCKS 方案已废弃,当前机制为 **BGP 黑洞通告 + mangle PBR 负载均衡**。
+当前基线最后核验于 **2026-09-01**。SOCKS 方案已废弃,当前机制为 **BGP 黑洞通告 + mangle PBR 负载均衡**。
 
 ## 一句话原理
 
@@ -15,7 +15,7 @@
 |---|---|---|
 | AR6140 | V300R024C00SPC100,`192.168.1.1`,AS 64527 | 双线出口、NAT、BGP 路由接收 |
 | 家里 ROS | RouterOS 7.24 stable,`192.168.1.2`,AS 64523 | BGP 黑洞通告、mangle PBR、隧道端点 |
-| 日本 CHR | RouterOS 7.24 stable,`202.144.194.248` | 隧道对端、公网出口 |
+| 日本 CHR | RouterOS 7.24 stable | 隧道对端、公网出口 |
 
 内网 `Vlanif1 192.168.1.0/24`,主 DNS `192.168.1.2`;`XGE0/0/0 = 192.168.2.1/30` 是 PC 10G 口直连段。
 
@@ -28,11 +28,12 @@
 | lo-CT | 192.168.0.1(LoopBack0) | 192.168.0.2 | CT_IMPORT → 100.74.0.1(电信 BRAS,Dialer1) |
 | lo-CM | 192.168.0.5(LoopBack1) | 192.168.0.6 | CM_IMPORT → 10.87.128.1(移动 BRAS,Dialer2) |
 | lo-wg | 192.168.0.9(LoopBack2) | 192.168.0.10 | WG_IMPORT → 192.168.30.1 |
-| lo-sstp | 192.168.0.13(LoopBack3) | 192.168.0.14 | SSTP_IMPORT → 192.168.20.1 |
+| lo-sstp | 192.168.0.13(LoopBack3) | 192.168.0.14 | SSTP_IMPORT → 192.168.20.2（PPP 对端） |
 
 ### AR 侧
 
-- 静态回程:4 条 peer `/32`、`192.168.20.0/30`、`192.168.30.0/30`、`192.168.40.0/30` → `192.168.1.2`;`202.144.194.248/32` → Dialer1+Dialer2
+- 内部可达性由 AR↔ROS 的 OSPFv2 Area 0 提供，接口使用点对点网络类型，只重分发 `192.168.0.0/16` 直连路由；对应的遗留内部静态路由已删除
+- 日本隧道公网端点保留双出口等价静态可达，避免隧道底座反向依赖隧道内路由
 - export 策略 `DENY_ALL` 纯接收;`maximum load-balancing ebgp 2`
 - 默认路由 2 条静态 + `track nqa admin ct/cm` 做线路探测
 
@@ -78,5 +79,6 @@ prerouting, in-interface=ether6, dst-address-list=blacklist, connection-state=ne
 
 ## 相关文档
 
+- 迁移复盘:[从静态路由迁移到 OSPF 后，BGP ECMP 为什么只剩一条](../blog/posts/bgp-ecmp-after-ospf.md)
 - 隧道参数:[隧道速查](tunnels.md)
 - DNS 链路:[DNS 防污染](dns-architecture.md)

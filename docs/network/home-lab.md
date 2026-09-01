@@ -1,6 +1,6 @@
 # 家庭网络总览
 
-2026-08-29 基于**全量配置导出**（ROS `/export show-sensitive` 781KB + AR `display current-configuration`）逐项核实，原始配置归档于 VPS `/root/config-backups/2026-08-29/`（含密钥，勿外传）。规则管线见 [ROS 规则管线](ros-rules-pipeline.md)。
+当前基线最后核验于 **2026-09-01**。原始配置和回滚快照仅保存在私有备份中，不进入公开仓库。规则管线见 [ROS 规则管线](ros-rules-pipeline.md)，历史原因见 [复盘笔记](../blog/index.md)。
 
 ## 拓扑总览
 
@@ -11,27 +11,28 @@
                                        │ XGE0/0/0: 192.168.2.1/30 ── 192.168.2.2（服务器，疑 OxiDNS）
                                        │
                                   ROS x86 (192.168.1.2, AS 64523, ether6=LAN)
-                                       ├─ wg-home ──→ 日本 VPS 202.144.194.248:端口跳跃(3258-10240)
-                                       ├─ sstp-jp ──→ 202.144.194.248:443（192.168.20.0/30）
-                                       └─ wg-cn ───→ 腾讯云 VPS 43.136.80.90（192.168.40.0/24，管理）
+                                       ├─ wg-home ──→ 日本 VPS（动态端口）
+                                       ├─ sstp-jp ──→ 日本 VPS（PPP 点对点）
+                                       └─ wg-cn ───→ 广州 VPS（管理隧道）
 ```
 
 - LAN 客户端 DHCP（AR global pool）：`192.168.1.30-125`，排除 `.2-.25`，**DNS 首选 192.168.1.2（ROS）**、备 192.168.1.1
 - AR↔ROS 两条互联：Vlanif1 二层（192.168.1.0/24）+ XGE 三层（192.168.2.0/30，ROS 侧经 AR 中转）
+- AR `Vlanif1` ↔ ROS `br-lan` 运行 OSPFv2 Area 0，双方接口均为点对点网络类型；只重分发 `192.168.0.0/16` 范围内的直连路由
 
 ## AR6140 详设（AS 64527）
 
 - **双拨双默认路由 ECMP**：`0/0 → Dialer1 track nqa ct`（探测电信网关 100.74.0.1）+ `→ Dialer2 track nqa cm`（探测 10.87.128.1），NQA 15s 间隔、2 次失败撤线
 - **NAT**：ACL 2001（192.168.1.0/24 + 192.168.2.0/30），**endpoint-independent** mapping/filter（近似 full-cone，对游戏/P2P 友好），ALG：dns/ftp/rtsp/sip/pptp
-- **BGP 出向重写**：CT_IMPORT/CM_IMPORT/WG_IMPORT/SSTP_IMPORT 把 ROS 宣告的 /32 黑洞路由的下一跳分别改写为 100.74.0.1（电信出口）/ 10.87.128.1（移动出口）/ 192.168.20.1（sstp）/ 192.168.30.1（wg）——**这是"哪个邻居学来的就从哪条线出去"的实现核心**；出向统一 DENY_ALL
-- 静态路由：4 个 ROS loopback /32 + 20.0/30、30.0/30、40.0/24 均指 192.168.1.2；**202.144.194.248/32 双线等价**（日本 VPS 走任意出口均可达）
-- 管理：SSH 52222（all 接口）、HTTPS 仅 acl 2998（192.168.2.2 / 192.168.1.24）、FTP 仅 acl 2999、用户 Tlop level 15、SNMPv3（Vlanif1）
+- **BGP 出向重写**：CT_IMPORT/CM_IMPORT/WG_IMPORT/SSTP_IMPORT 把 ROS 宣告的业务路由下一跳分别改写为电信出口、移动出口、`192.168.30.1`（WG）和 `192.168.20.2`（SSTP 对端）——**这是“哪个邻居学来的就从哪条线出去”的实现核心**；出向统一 DENY_ALL
+- **内部路由**：ROS 的 loopback 与隧道直连前缀由 OSPF 学习，已清理对应的遗留静态路由；公网隧道端点仍由双出口保证可达
+- **管理面**：管理协议按可信来源和接口限制；具体入口、账号与端口不在公开文档披露
 - 加固：`undo icmp timestamp-request`、drop illegal-mac alarm、NTP cn.pool + ntp.ntsc.ac.cn
 
 ## ROS 详设（AS 64523）
 
 - **地址**：lo 多播（192.168.0.2/.6/.10/.14，BGP 对端）、ether6 192.168.1.2/24（LAN）、wg-cn 192.168.40.2/24、wg-home 192.168.30.1/30
-- **服务**：仅 ssh 52222 + winbox 52323（其余全禁）；**无 /ip firewall filter 规则**——安全依赖 AR NAT 与内网信任，属设计取舍
+- **管理服务**：仅用于内网与管理隧道，具体暴露面以设备实时配置为准；管理入口不在公开文档披露
 - **NAT**：出 wg-home 伪装为 192.168.30.1、出 sstp-jp 伪装为 192.168.20.1
 - **策略路由（递归锚点设计）**：
     - `jp-wg`：默认 gateway=1.1.1.1（check-gateway=ping）⇐ 递归路由 `1.1.1.1/32 via 192.168.30.2`（wg-home 对端 DNS）⇐ wg-home 出隧道
@@ -63,6 +64,7 @@
 
 ## 已知问题与待办
 
+- [x] 静态路由迁移 OSPF 后 BGP ECMP 消失：根因为 SSTP PPP `/32` 与遗留下一跳造成 IGP cost 不等，已改用 PPP 对端下一跳并恢复 ECMP，见[复盘](../blog/posts/bgp-ecmp-after-ospf.md)
 - ~~jp-wg 默认路由间歇翻动~~ **确认为设计内行为，无问题**（2026-08-29 用户确认）：wg-port 每分钟改写 endpoint-port 的瞬间 check-gateway 探测短暂失败、路由翻到 fallback，握手恢复后自愈；已有连接靠 connection-mark 不受影响。无需修复
 - [x] proxy-domain.rsc（5197 条）已导入，ROS DNS 静态 4085 → 5197
 - [x] cn-unicom / cn-cernet 已导入（CU=1907 / CC=396），CN/CT/CM 已按管线数据整表重建
