@@ -45,3 +45,14 @@
 - [双线出口与分流](dual-wan-routing.md)
 - [隧道速查](tunnels.md)
 - [DNS 防污染](dns-architecture.md)
+
+
+## DNS 分流（OxiDNS）相关
+
+- **运营商 DNS 禁 ICMP**：`ping 202.103.224.68` 不通 **≠** 不可用（实测 UDP 53 正常返回）。判断上游可用性要看业务层（发实际查询），别用 ping
+- **dstnat 回环**：把 :53 劫持指向某个容器后，该容器自身的上游查询也会命中同一条规则。必须把它的地址加进 `address-list=DNS` 白名单，否则查询自己打自己
+- **地址列表写入"看起来没生效"**：OxiDNS 写 `blacklist` 时，若目标 IP 已存在（ROS 联动注入过），它**既不计成功也不计错误**（两个指标都是 0）。别据此判断插件故障——用不在表里的新域名验证
+- **容器直连 GitHub 不通**：OxiDNS 拉 `geosite.dat` 这类 GitHub releases 资源会失败；应由 VPS 代拉后放内网镜像，容器再从镜像拉
+- **镜像服务改白名单必须重启**：`repos.json` 加了新仓库后要 `systemctl restart github-mirror`，否则新源一律 403
+- **全局指标不能判断单个域名走向**：`forward_query_total` 是累计值，会被其它设备的查询干扰；要看单个域名命中哪条规则，得开 `query_recorder` 或看 provider 匹配
+- **日更静默失败**：生成器拉不到上游会 abort，但没人看日志就发现不了（曾连续 3 天产物没更新而 ROS 一直拉旧文件）。现在生成器改为"拉取即留档、失败回退上一版"，且可用产物 mtime 快速判断

@@ -1,30 +1,35 @@
-# DNS 防污染
+# DNS 分流架构
+
+当前基线核验于 **2026-09-16**。核心变化：DNS 服务由 **OxiDNS**（运行在 ROS 上的容器）接管，早期的 smartdns 容器已下线。
 
 ## 完整链路
 
 ```
-PC → 家里 ROS(192.168.1.2,主 DNS)
-      ├─ blacklist 域名(FWD 命中)→ forwarders "DNS"(192.168.20.2, 192.168.30.2)
-      │     → sstp/wg 双隧道 → 日本 CHR → CHR forwarders "DNS"(1.1.1.1, 8.8.8.8)
-      │     → 真实 IP → 自动写入 blacklist → 走隧道
-      └─ 普通域名 → servers=192.168.1.1(AR)→ AR dns proxy → 运营商 DNS
+LAN 客户端（DHCP 下发 DNS = 192.168.1.2）
+      ↓
+ROS dstnat：LAN 的 :53（udp+tcp）统一劫持到 192.168.1.3（OxiDNS）
+      │  白名单 address-list=DNS 含 1.1 / 1.2 / 1.3 自身，避免上游查询被回环劫持
+      ↓
+OxiDNS（192.168.1.3）
+      ├─ AAAA → 空应答（内网无 IPv6，直接压制）
+      ├─ IP 测速优选 + 缓存
+      ├─ 命中「自家代理域名表」→ 远端：192.168.30.2 / 192.168.20.2（日本双隧道）
+      ├─ 非国内（cn 表补集反转）→ 同样走远端，避免名单外域名被污染
+      └─ 其余（国内）→ 6 台国内 DNS 并发竞速
+             └ 凡走远端的域名：解析结果自动注入 ROS 的 blacklist
+      ↓
+ROS mangle：dst-address-list=blacklist → 日本隧道（jp-wg / jp-sstp 各半分流）
 ```
 
-## 关键点(勿改错)
+## 关键点（勿改错）
 
-- 家里 ROS 的 DNS 上游转发在 `/ip/dns/forwarders`,**不在 servers**:
-  `forwarders name="DNS" dns-servers=192.168.20.2,192.168.30.2`
-- FWD 条目的 `forward-to=DNS` 指向这个名为 `DNS` 的 forwarders 条目,不是全局 servers
-- 验证记录(twitter.com):经 ROS 解析 = `172.66.0.227`(Cloudflare 真实);
-  直连运营商 = `104.244.42.197`(污染)。防污染链路完好时勿动
+- **入口劫持在 ROS**：`dstnat` 把 LAN 的 53 端口指向 OxiDNS。`address-list=DNS` 白名单**必须**包含 `192.168.1.3`——否则 OxiDNS 自己的上游查询会被同一条规则重新劫持回自己，形成回环（曾导致上游大面积超时、解析失败）
+- **两条判据都指向远端**：① 自家代理域名表命中；② 不在国内表内（cn 反转）。前者保精度（有手工与剔除调优），后者保不漏
+- **DNS 只解决"去哪解析"，流量走向靠 IP 列表**：远端解析出的 IP 写入 ROS `blacklist`，再由 mangle 决定隧道
+- **不走 DNS 的服务**（Telegram 等客户端硬编码 IP）必须靠 IP 段兜底，见 [ROS 规则管线](ros-rules-pipeline.md)
+- 国内上游池：电信 `202.103.224.68` / `202.103.225.68`、移动 `211.138.240.100` / `211.138.245.180`、阿里 `223.5.5.5`、腾讯 `119.29.29.29`；远端池 = 两条日本隧道对端
 
-## blacklist 联动设计
+## 沿革
 
-- DNS 解析出被墙域名的真实 IP 后,自动加入 `blacklist` 地址表
-- BGP 把 blacklist 通告给 AR(回送 ROS)+ mangle PBR 分流,见[双线出口与分流](dual-wan-routing.md)
-- blacklist 域名 FWD 表唯一来源:`proxy-domain.rsc`(手工 + 上游,整表重建),见[ROS 规则管线](ros-rules-pipeline.md)
-
-## 相关文档
-
-- 分流逻辑:[双线出口与分流](dual-wan-routing.md)
-- 隧道参数:[隧道速查](tunnels.md)
+- 早期：ROS `/ip dns static type=FWD`（约 29016 条域名）+ smartdns 容器兜底优选
+- 2026-09-16：smartdns 下线；OxiDNS 接管，域名表改为 Git 分发、每日自动更新
