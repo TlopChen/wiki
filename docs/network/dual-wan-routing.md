@@ -83,14 +83,23 @@ prerouting, in-interface=<LAN>, dst-address-list=blacklist, connection-state=new
 
 分流粒度按连接均分（所有者决定），不按业务类型细分。
 
-## 隧道故障转移：递归公共 DNS 方案
+## 隧道故障转移
+
+!!! warning "现状（2026-10-01 核对）"
+    两个 WG 表的**默认路由 next-hop 直接写隧道对端**，用 `check-gateway=ping` 探测对端；
+    两表各带一条 `distance=2` 指向另一条隧道的路由，互为主备。
+
+**边界**：探测隧道对端只能证明"隧道对端可达"，**不能证明日本公网出口正常**。
+握手正常但远端出口故障时，两表都不会自动撤路由。
+
+### 历史方案：递归公共 DNS
 
 !!! tip "原理"
     默认路由 next-hop 写公共 DNS IP（递归路由），main 表放锚点让网关递归解析到隧道对端；
-    `check-gateway=ping` 每 10s 探测公共 DNS，端到端不通则主路由失效，`distance=2` 的 fallback 接管。
+    `check-gateway=ping` 探测公共 DNS，端到端不通则主路由失效，`distance=2` 的 fallback 接管。
 
 - main 表锚点：`1.1.1.1/32 → <wg-cm 对端>`、`8.8.8.8/32 → <wg-ct 对端>`，两条腿用不同探测目标区分
-- 两条隧道互为主备（各自另有一条 `distance=2` 指向另一条隧道的路由）
+  （锚点现在**还留在 main 表**，但当前默认路由已不再依赖它）
 - 递归路由三大坑（实测）：
     1. 自定义 routing-table 里 gateway 的递归解析查 **main 表**——锚点必须放 main 表
     2. 递归要求中间路由的 `scope` < 引用路由的 `target-scope`

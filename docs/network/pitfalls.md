@@ -39,7 +39,7 @@
 
 ## 云平台差异
 
-- **腾讯云轻量有平台 PAT**:外部 UDP 入站被改源端口,跳端口 redirect 方案失效,只能固定端口(WG 用 51820)
+- **腾讯云轻量有平台 PAT**:外部 UDP 入站的源端口会被改写。能固定的只有**服务端监听口**(广州 WG 用 51820);客户端入口端口仍然每分钟跳,广州侧用一段端口 `redirect` 到 51820 承接——别误读成"客户端不跳端口"
 - **nftables policy drop 会丢 ICMP echo-request**:导致"VPS ping 通 ROS、ROS ping 不通 VPS"的单向假象,需 input 放行 `icmp type echo-request`
 - VPS 侧 wg peer 必须把家庭 LAN 段加进 AllowedIPs **并**加回程路由,否则 LAN 回程不通
 

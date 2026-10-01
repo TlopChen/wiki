@@ -54,8 +54,9 @@ scripts/
 
 | 文件 | 消费端 |
 |---|---|
-| `proxy-domain.rsc`、`cn*.rsc`、`blacklist.rsc`、`sync.rsc` | RouterOS（`/import`） |
-| `proxy-domain.oxi.txt`、`cn-domains.oxi.txt`、`geosite.dat` | OxiDNS |
+| `cn-telecom.rsc`、`cn-mobile.rsc`、`blacklist.rsc`、`direct-ipv4*.rsc` | RouterOS 地址表（由 ROS 的 `sync.rsc` 导入） |
+| `proxy-domain.rsc`、`cn.rsc`、`cn-unicom.rsc`、`cn-cernet.rsc` | RouterOS 备用产物（当前六表同步不导入；域名分流已交给 OxiDNS） |
+| `proxy-domain.oxi.txt`、`cn-domains.oxi.txt`、`geosite.dat` | OxiDNS（ROS 拉取到本地后再 reload） |
 | `proxy-domain.domains.txt`、`proxy-domain.exact.txt` | 通用中间产物（其它 DNS 可自行转换） |
 | `direct-ipv4.rsc`、`direct-ipv4-nocm.rsc`、`direct-ipv4-noct.rsc` | RouterOS 地址表 / 按运营商派生 |
 

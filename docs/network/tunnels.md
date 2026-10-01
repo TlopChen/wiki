@@ -6,7 +6,7 @@
 |---|---|---|---|---|---|
 | `wg-ct` | 192.168.20.0/30 | .1 | 日本节点 .2 | **锁电信** | 动态 endpoint 端口；公网跳端口段与实际监听端口不公开 |
 | `wg-cm` | 192.168.30.0/30 | .1 | 日本节点 .2 | **锁移动** | 同上（原 `wg-home`，2026-09-22 更名） |
-| `wg-cn` | 192.168.40.0/24 | .2 | 广州 VPS .1 | — | 固定 UDP 端口（云平台 PAT 下不使用跳端口） |
+| `wg-cn` | 192.168.40.0/24 | .2 | 广州 VPS .1 | — | 入口端口**同样每分钟跳**；广州侧监听口固定 51820 |
 
 `sstp-jp` 已于 2026-09-21 随日本节点迁移退役（原 PPP 点对点隧道），现在是**两条独立 WG 隧道**并行，各自锁定一条家宽出口。
 
@@ -34,21 +34,29 @@
 - 入口：nftables `ip nat prerouting` 把两条动态端口段分别 `redirect` 到各自的内部监听端口；`input` 默认 DROP，只放业务端口与 ICMP/ICMPv6
 - 转发：`ip_forward=1`、出 `eth0` masquerade、双向 **MSS 自动钳制**（`set rt mtu`）
 - DNS：dnsmasq 同时 `interface=wg-ct` 与 `interface=wg-cm`，两条隧道各暴露一个上游地址供内网 OxiDNS 双活
-- 保活：家里 ROS 的 `wg` 脚本每分钟改写两条隧道的 `endpoint-port`；两侧 peer `persistent-keepalive=25s`
+- 保活：家里 ROS 的 `wg` 脚本每分钟改写**三条**隧道的 `endpoint-port`；两侧 peer `persistent-keepalive=25s`
 - 迁移前该角色由 RouterOS CHR 承担（单 `wg0` + SSTP），CHR 已退订、配置零残留
 
 ## 广州 VPS(wg-cn,Debian 13)
 
-- WireGuard 配置:`/etc/wireguard/wg-cn.conf`，使用固定监听端口
+- WireGuard 配置:`/etc/wireguard/wg-cn.conf`，**服务端监听口固定**（51820）；客户端入口端口由 ROS 每分钟更换，广州侧用一段端口 `redirect` 到 51820
 - peer AllowedIPs = `192.168.40.2/32 + 192.168.1.0/24`(回程全家 LAN)
 - PostUp 回程路由:`192.168.1.0/24 via 192.168.40.2 dev wg-cn`
 - nftables 默认 drop，仅放行受控管理来源、WireGuard 与必要 ICMP
 - peer `persistent-keepalive=25s`（2026-09-22 与日本两条统一）
 
-## 为什么日本能跳端口、广州不能
+## 端口跳跃：三条隧道各自怎么落地
 
-- 日本节点无云平台 NAT，公网直达，redirect 跳端口有效
-- 腾讯云轻量有平台 PAT：外部 UDP 入站会被改源端口，redirect 计数不涨或涨了不投递；只能固定端口
+| 隧道 | 客户端入口端口 | 服务端落地 |
+|---|---|---|
+| `wg-ct` | 每分钟变（范围不公开） | 日本侧 nftables 按目的端口段 `redirect` 到内部监听口 |
+| `wg-cm` | 每分钟变（与 `wg-ct` 用不同端口段） | 同上 |
+| `wg-cn` | **同样每分钟变** | 广州侧 nftables `redirect` 到固定监听口 51820 |
+
+- 日本节点无云平台 NAT、公网直达，按目的端口段 redirect 有效；
+- 广州是腾讯云轻量、有平台 PAT：**能固定的只有服务端监听口**（51820）。客户端入口端口照样每分钟变，
+  广州侧用一段端口 `redirect` 到 51820 承接；
+- ⚠️ 别把"广州监听口固定"误读成"广州隧道不跳端口"——早期文档就是这么写错的。
 
 ## 相关文档
 
