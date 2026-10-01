@@ -13,8 +13,9 @@
    ├─ gen_cn.py     → cn-domains.oxi.txt（国内域名表）
    └─ fetch_bin.py  → geosite.dat（二进制素材）
    ↓ scripts/_infra/publish.sh → 内网 HTTP 根 /ros/<文件>
-   ├─ ROS     06:30  sync.rsc → /import（六张地址表）
-   └─ OxiDNS  07:00  rules_download → rules_reload（三份表热重载）
+   └─ ROS  唯一拉取方（06:30 定时 / 按需 manual-refresh）
+        ├─ 六张地址表       → /import
+        └─ OxiDNS 三份规则  → 本地文件（OxiDNS 自己不再联网）
 ```
 
 设计要点：**生成与分发解耦、格式适配分层**。仓库主体是脚本，ROS / OxiDNS 只是产物的消费端；
@@ -73,9 +74,12 @@ scripts/
 /system script run manual-refresh
 ```
 
-ROS 的 `manual-refresh` 一次做两件事：① 复用六表地址同步；② 把 OxiDNS 三份规则覆盖到挂载目录后
-重启容器重载。OxiDNS 的重载只有它内部的任务链（`rules_download` → `rules_reload`）能触发，
-所以用整体重启容器实现立即生效——重启期间 DNS 约 1–8 秒不可用。
+ROS 的 `manual-refresh` = 跑一次 `ros-rules-sync`（一次拉齐六张地址表 + OxiDNS 三份规则）+ 重启容器立即重载。
+
+**OxiDNS 已改成只读本地文件**：它的 `rules_download` 已从任务链摘除，只保留每天 07:00 的 `rules_reload`。
+容器启动与重载都不再需要网络，隧道或镜像不可用也不影响它；规则新鲜度由 ROS 侧拉取决定
+（06:30 放好文件 → 07:00 本地 reload 生效，没有中断）。重启容器只是为了让手工改动立即生效，
+代价是约 1–8 秒 DNS 不可用。
 
 ## 两条重要语义（勿破坏）
 
