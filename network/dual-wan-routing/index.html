@@ -1,0 +1,1309 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="网络运维 / RouterOS / 架构复盘 / GitHub 学习笔记">
+      
+      
+      
+        <link rel="canonical" href="https://tlopchen.github.io/wiki/network/dual-wan-routing/">
+      
+      
+        <link rel="prev" href="../home-lab/">
+      
+      
+        <link rel="next" href="../tunnels/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>双线出口与分流 - TlopChen 知识库</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bgp-ar-pbr-mangle-pbr" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="TlopChen 知识库" class="md-header__button md-logo" aria-label="TlopChen 知识库" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TlopChen 知识库
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              双线出口与分流
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="切换到暗色"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换到暗色" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="切换到亮色"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换到亮色" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="TlopChen 知识库" class="md-nav__button md-logo" aria-label="TlopChen 知识库" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    TlopChen 知识库
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    
+  
+  
+    <li class="md-nav__item">
+      <a href="../../blog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    复盘笔记
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    标签索引
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    网络运维
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    网络运维
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../home-lab/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    家庭网络总览
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    双线出口与分流
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    双线出口与分流
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一句话原理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        节点与角色
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bgp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BGP 设计
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BGP 设计">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-09-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        地址规划（2026-09-22 版）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ecmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ECMP 等价条件（重要）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AR 侧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ros" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROS 侧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ar-pbr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AR 目的端口 PBR（两条隧道各自锁线）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mangle-pbrblacklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mangle PBR（blacklist 与默认流量承接）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        隧道故障转移
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="隧道故障转移">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        历史方案：递归公共 DNS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        已知弱点
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        相关文档
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tunnels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    隧道速查
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dns-architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DNS 防污染
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ros-rules-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ROS 规则管线
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pitfalls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    坑与排障手册
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitHub 学习
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    GitHub 学习
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../github/git-basics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Git 基础操作
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../github/pages-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pages 与 Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        一句话原理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        节点与角色
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bgp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BGP 设计
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BGP 设计">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-09-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        地址规划（2026-09-22 版）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ecmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ECMP 等价条件（重要）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AR 侧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ros" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROS 侧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ar-pbr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AR 目的端口 PBR（两条隧道各自锁线）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mangle-pbrblacklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        mangle PBR（blacklist 与默认流量承接）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        隧道故障转移
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="隧道故障转移">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        历史方案：递归公共 DNS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        已知弱点
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        相关文档
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="bgp-ar-pbr-mangle-pbr">双线出口与分流(BGP 黑洞通告 + AR 目的端口 PBR + mangle PBR)<a class="headerlink" href="#bgp-ar-pbr-mangle-pbr" title="Permanent link">&para;</a></h1>
+<p>当前路由与宣告源核验于 <strong>2026-10-04 22:01–22:03，北京时间</strong>。机制沿革：SOCKS 中转 → BGP 黑洞通告 + mangle PBR → （2026-09-22）<strong>两条 WG 隧道各自锁定电信/移动</strong>。</p>
+<h2 id="_1">一句话原理<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<ul>
+<li>AR6140 双 PPPoE（电信 <code>Dialer1</code> + 移动 <code>Dialer2</code>）做 NAT 出口</li>
+<li>ROS 国内通道宣告 DIRECT_IP_NOCM / DIRECT_IP_NOCT，日本通道宣告 blacklist</li>
+<li>AR 国内明细导向家宽；未命中明细时，优先级 50 的双默认路由指向日本隧道对端，经 ROS 递归可达</li>
+<li>ROS 对 blacklist 和非 DIRECT_IP、非内部地址的 LAN 新连接做 PCC，均分到两条日本隧道</li>
+<li>两条隧道各用<strong>一段独立的动态跳端口</strong>，AR 在 x86 入口口上按目的端口段做策略路由，把它们分别锁到电信 / 移动出口</li>
+</ul>
+<h2 id="_2">节点与角色<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>节点</th>
+<th>系统</th>
+<th>角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AR6140</td>
+<td>V300R024C00SPC100,<code>192.168.1.1</code>,AS 64527</td>
+<td>双线出口、NAT、BGP 路由接收、<strong>目的端口 PBR</strong></td>
+</tr>
+<tr>
+<td>家里 ROS</td>
+<td>RouterOS 7.24 stable,<code>192.168.1.2</code>,AS 64523</td>
+<td>BGP 黑洞通告、mangle PBR、隧道端点</td>
+</tr>
+<tr>
+<td>日本节点</td>
+<td>Debian 13（2026-09-21 起，原 RouterOS CHR）</td>
+<td>两条隧道对端、公网出口、dnsmasq</td>
+</tr>
+</tbody>
+</table>
+<p>内网 <code>Vlanif1 192.168.1.0/24</code>,主 DNS <code>192.168.1.3</code>;<code>XGE0/0/0 = 192.168.2.1/30</code> 是 PC 10G 口直连段。</p>
+<h2 id="bgp">BGP 设计<a class="headerlink" href="#bgp" title="Permanent link">&para;</a></h2>
+<h3 id="2026-09-22">地址规划（2026-09-22 版）<a class="headerlink" href="#2026-09-22" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>通道</th>
+<th>AR 源(loopback)</th>
+<th>ROS lo</th>
+<th>AR import policy</th>
+<th>AR 导入 next-hop</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>lo-CT</td>
+<td>192.168.0.1(LoopBack0)</td>
+<td>192.168.0.2</td>
+<td><code>CT_IMPORT</code></td>
+<td><code>100.74.0.1</code></td>
+<td>电信直连</td>
+</tr>
+<tr>
+<td>lo-CM</td>
+<td>192.168.0.5(LoopBack1)</td>
+<td>192.168.0.6</td>
+<td><code>CM_IMPORT</code></td>
+<td><code>10.87.128.1</code></td>
+<td>移动直连</td>
+</tr>
+<tr>
+<td>lo-CT-WG</td>
+<td>192.168.0.9(LoopBack2)</td>
+<td>192.168.0.10</td>
+<td><strong><code>CM-WG_IMPORT</code></strong></td>
+<td><code>192.168.30.1</code></td>
+<td>经 <strong>wg-cm</strong> 出日本</td>
+</tr>
+<tr>
+<td>lo-CM-WG</td>
+<td>192.168.0.13(LoopBack3)</td>
+<td>192.168.0.14</td>
+<td><strong><code>WG-CT_IMPORT</code></strong></td>
+<td><code>192.168.20.1</code></td>
+<td>经 <strong>wg-ct</strong> 出日本</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>2026-09-22 调整：原 <code>WG_IMPORT</code> / <code>SSTP_IMPORT</code> 更名为 <code>CM-WG_IMPORT</code> / <code>WG-CT_IMPORT</code>。VRP <strong>不支持 route-policy 改名</strong>，实际操作是"建新 policy → 改 peer 引用 → 删旧 → <code>refresh bgp all import</code> 软复位"。SSTP 通道已随节点迁移退役。</p>
+</blockquote>
+<h3 id="ecmp">ECMP 等价条件（重要）<a class="headerlink" href="#ecmp" title="Permanent link">&para;</a></h3>
+<p>两条 eBGP 路由要合并为等价路由，<strong>next-hop 必须写成 x86 侧的隧道地址</strong>（<code>192.168.20.1</code> / <code>192.168.30.1</code>），且 RelayNextHop 与出接口一致。</p>
+<p>若把 next-hop 写成隧道<strong>对端</strong>地址（如 <code>192.168.20.2</code>），两条路径 next-hop 不同 → 不构成等价，<code>display ip routing-table &lt;ip&gt; verbose</code> 会显示成<strong>两个独立的 Destination 块</strong>（容易与 ECMP 的"同一 Destination 两行"混淆）。全局 <code>maximum load-balancing ebgp 2</code>。</p>
+<h3 id="ar">AR 侧<a class="headerlink" href="#ar" title="Permanent link">&para;</a></h3>
+<ul>
+<li>内部可达性由 AR↔ROS 的 OSPFv2 Area 0 提供，接口使用点对点网络类型，只重分发 <code>192.168.0.0/16</code> 直连路由</li>
+<li>日本隧道公网端点保留双出口等价静态可达，避免隧道底座反向依赖隧道内路由</li>
+<li>export 策略 <code>DENY_ALL</code> 纯接收</li>
+<li>优先缺省：0/0 → 192.168.20.2 / 192.168.30.2，preference 50，均 Active，RelayNextHop 均为 ROS。旧两条运营商缺省 preference 60，本轮 Inactive，保留原 NQA。优先隧道缺省未配置 NQA，OSPF 可达不能证明隧道或日本公网健康。</li>
+</ul>
+<h3 id="ros">ROS 侧<a class="headerlink" href="#ros" title="Permanent link">&para;</a></h3>
+<ul>
+<li>lo-CT 的 output.network=DIRECT_IP_NOCM，lo-CM 为 DIRECT_IP_NOCT；日本通道仍为 blacklist。CT / CM 仍同步，不能再把它们的数量等同 BGP 收到前缀数。</li>
+<li>四会话均 Established：AR 国内收到 7646 / 6909，日本各 2455；ROS DIRECT_IP=6326，分表=7646 / 6909，与广州产物报告一致。数量随日更与动态注入变化。</li>
+</ul>
+<h2 id="ar-pbr">AR 目的端口 PBR（两条隧道各自锁线）<a class="headerlink" href="#ar-pbr" title="Permanent link">&para;</a></h2>
+<p><code>GigabitEthernet0/0/1</code>（x86 的实际接入口）入向挂 <code>traffic-policy p-lb2</code>：</p>
+<div class="highlight"><pre><span></span><code>acl 3999   permit udp source 192.168.1.2 0 destination &lt;日本节点&gt; 0 destination-port range &lt;wg-ct 跳端口段&gt;
+acl 3998   permit udp source 192.168.1.2 0 destination &lt;日本节点&gt; 0 destination-port range &lt;wg-cm 跳端口段&gt;
+traffic behavior b-tel-nh : redirect ip-nexthop 100.74.0.1   (电信)
+traffic behavior b-mob-nh : redirect ip-nexthop 10.87.128.1  (移动)
+traffic policy   p-lb2    : classifier c-tel → b-tel-nh ; classifier c-mob → b-mob-nh
+interface GigabitEthernet0/0/1 : traffic-policy p-lb2 inbound
+</code></pre></div>
+<p>要点与限制：</p>
+<ul>
+<li>该 <strong>lan-board 只支持 <code>redirect ip-nexthop</code></strong>：写 <code>redirect interface Dialer1</code> 会提示 <code>not supported on lan-board</code>（配置能存下，但不执行）</li>
+<li>策略只匹配「源 <code>192.168.1.2</code> → 目的日本节点」的 UDP，不触及其它内网流量，也不影响 wg-cn</li>
+<li>两条隧道因此<strong>各锁一条家宽</strong>：<code>wg-ct</code> 恒走电信、<code>wg-cm</code> 恒走移动（端口仍在段内跳，线路不变）</li>
+<li>代价：依赖 PPP 对端网关字面量，且<strong>没有 backup</strong>（见"已知弱点"）</li>
+</ul>
+<h2 id="mangle-pbrblacklist">mangle PBR（blacklist 与默认流量承接）<a class="headerlink" href="#mangle-pbrblacklist" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>prerouting, in-interface=&lt;LAN&gt;, dst-address-list=blacklist, connection-state=new
+  + per-connection-classifier=both-addresses-and-ports:2/0 → mark-connection → 路由表 WG-CT
+  + per-connection-classifier=both-addresses-and-ports:2/1 → mark-connection → 路由表 WG-CM
+→ 两表默认路由分别走 wg-ct / wg-cm（各带 distance=2 的互备路由）
+→ srcnat：出隧道前把源改写成 192.168.20.1 / 192.168.30.1
+</code></pre></div>
+<p>blacklist PCC 后，另有两条 default-AR-WG 规则：LAN 入向、目的非本机、非 192.168.0.0/16、不在 DIRECT_IP 的新连接，同样按 2/0 与 2/1 打连接标记，再选 WG 表。它们承接 AR 默认流量，避免未经标记循 ROS main 缺省回 AR。ROS main 缺省仍为 AR，routing rule 当前为空。</p>
+<p>本轮核对配置与对端连通，未主动断线验证整体故障转移。</p>
+<h2 id="_3">隧道故障转移<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">现状（2026-10-01 核对）</p>
+<p>两个 WG 表的<strong>默认路由 next-hop 直接写隧道对端</strong>，用 <code>check-gateway=ping</code> 探测对端；
+两表各带一条 <code>distance=2</code> 指向另一条隧道的路由，互为主备。</p>
+</div>
+<p><strong>边界</strong>：探测隧道对端只能证明"隧道对端可达"，<strong>不能证明日本公网出口正常</strong>。
+握手正常但远端出口故障时，两表都不会自动撤路由。</p>
+<h3 id="dns">历史方案：递归公共 DNS<a class="headerlink" href="#dns" title="Permanent link">&para;</a></h3>
+<div class="admonition tip">
+<p class="admonition-title">原理</p>
+<p>默认路由 next-hop 写公共 DNS IP（递归路由），main 表放锚点让网关递归解析到隧道对端；
+<code>check-gateway=ping</code> 探测公共 DNS，端到端不通则主路由失效，<code>distance=2</code> 的 fallback 接管。</p>
+</div>
+<ul>
+<li>main 表锚点：<code>1.1.1.1/32 → &lt;wg-cm 对端&gt;</code>、<code>8.8.8.8/32 → &lt;wg-ct 对端&gt;</code>，两条腿用不同探测目标区分
+  （锚点现在<strong>还留在 main 表</strong>，但当前默认路由已不再依赖它）</li>
+<li>递归路由三大坑（实测）：<ol>
+<li>自定义 routing-table 里 gateway 的递归解析查 <strong>main 表</strong>——锚点必须放 main 表</li>
+<li>递归要求中间路由的 <code>scope</code> &lt; 引用路由的 <code>target-scope</code></li>
+<li><code>check-gateway=ping</code> 两连败（约 20s）才撤路由，两连胜才恢复</li>
+</ol>
+</li>
+</ul>
+<h2 id="_4">已知弱点<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>PBR 无失败回退</strong>：目的端口 PBR 是写死的 <code>redirect ip-nexthop</code>，某条家宽故障或运营商重拨导致网关变化时，对应端口段（等于整条隧道）会黑洞，没有 backup。候选改法是给 traffic behavior 加 <code>backup-nexthop</code> + NQA track，但需先验证该 lan-board 是否支持</li>
+<li><strong>首包机制已改变</strong>：非 DIRECT_IP 的 LAN 新连接有默认 PCC 承接，降低对 blacklist 传播的依赖；国内表与 DNS 视图冲突、地址表同步时序仍需核对，不能声称所有首包问题已消除。</li>
+<li>blacklist 里的大范围条目（如 <code>co.jp</code>）有误伤风险，排障见<a href="../pitfalls/">坑与排障手册</a></li>
+</ul>
+<h2 id="_5">相关文档<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<ul>
+<li>复盘:<a href="../../blog/2026/09/01/%E4%BB%8E%E9%9D%99%E6%80%81%E8%B7%AF%E7%94%B1%E8%BF%81%E7%A7%BB%E5%88%B0-ospf-%E5%90%8Ebgp-ecmp-%E4%B8%BA%E4%BB%80%E4%B9%88%E5%8F%AA%E5%89%A9%E4%B8%80%E6%9D%A1/">从静态路由迁移到 OSPF 后，BGP ECMP 为什么只剩一条</a></li>
+<li>复盘:<a href="../../blog/2026/09/22/%E4%B8%A4%E6%9D%A1-wg-%E9%9A%A7%E9%81%93%E6%80%8E%E6%A0%B7%E5%90%84%E9%94%81%E4%B8%80%E6%9D%A1%E5%87%BA%E5%8F%A3/">两条 WG 隧道怎样各锁一条出口</a></li>
+<li>隧道参数:<a href="../tunnels/">隧道速查</a></li>
+<li>DNS 链路:<a href="../dns-architecture/">DNS 防污染</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.top", "search.suggest", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
