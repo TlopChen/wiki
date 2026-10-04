@@ -6,7 +6,7 @@
 
 - **"解析正常但连不上/黑洞"**:先查 `blacklist` 联动是否误伤(曾经 MikroTik 官网被黑洞误伤)
 - **ROS 本机更新失败 / Check For Updates 报 Host unreachable**:架构限制,ROS 本机流量不走隧道形成环路,不是故障;版本最新时忽略,更新走手动 npk(VPS 下载 → 隧道 → ROS)
-- **remote 排障**:AR SSH exec 模式断连缺陷仍在,用交互式登录(paramiko 交互方案),勿再查配置
+- **AR SSH**：exec 会断连，用交互式终端，处理分页并等完整提示符返回。
 
 ## 路由与 rp-filter
 
@@ -62,9 +62,20 @@
 - **运营商 DNS 禁 ICMP**：`ping 202.103.224.68` 不通 **≠** 不可用（实测 UDP 53 正常返回）。判断上游可用性要看业务层（发实际查询），别用 ping
 - **dstnat 回环**：把 :53 劫持指向某个容器后，该容器自身的上游查询也会命中同一条规则。必须把它的地址加进 `address-list=DNS` 白名单，否则查询自己打自己
 - **地址列表写入"看起来没生效"**：OxiDNS 写 `blacklist` 时，若目标 IP 已存在（ROS 联动注入过），它**既不计成功也不计错误**（两个指标都是 0）。别据此判断插件故障——用不在表里的新域名验证
-- **容器直连 GitHub 不通**：OxiDNS 拉 `geosite.dat` 这类 GitHub releases 资源会失败；应由 VPS 代拉后放内网镜像，容器再从镜像拉
+- **规则下载归属**：广州取上游发布，ROS 唯一下载到本地，OxiDNS 只 reload，下载插件已删除。
 - **镜像服务改白名单必须重启**：`repos.json` 加了新仓库后要 `systemctl restart github-mirror`，否则新源一律 403
 - **全局指标不能判断单个域名走向**：`forward_query_total` 是累计值，会被其它设备的查询干扰；要看单个域名命中哪条规则，得开 `query_recorder` 或看 provider 匹配
 - **日更静默失败**：生成器拉不到上游会 abort，但没人看日志就发现不了（曾连续 3 天产物没更新而 ROS 一直拉旧文件）。现在生成器改为"拉取即留档、失败回退上一版"，且可用产物 mtime 快速判断
 - **AR 的 DNS 缓存关不掉**：命令空间只有 `dns application cache ttl maximum`（默认 86400，下限 3600 不可配），没有 enable/disable。要让缓存彻底单层化，只能让 AR 退出客户端解析（`undo dns proxy enable` + 不再下发 1.1），代价是丢掉运营商 DNS 兜底
 - **静态 DNS 优先于动态**：AR 上静态配置的 `dns server` 拿 `Priority 0`，PPPoE 下发的运营商 DNS 是 `Priority 1–4` 兜底；用 `display dns server verbose` 核对
+
+
+## 2026-10-03–04 补记
+
+- 分支规则未匹配与上游失败要分开；三段互斥，无应答 reject 2，不能用 !has_resp → CN 跨组兜底，也不能伪造 NXDOMAIN。
+- validate 成功不等于上线：必须核对 reload、last_error、running/target 版本。
+- OxiDNS 已关闭负缓存与持久化，正缓存 lazy=600 秒；AR、日本 dnsmasq、Windows 仍有缓存。
+- 移动腿握手与 ping 正常但 DNS 应答计数低；结合竞速取消与报文判断，不要把 loser 未计 success 直接当丢包。
+- 10-03 换源监听端口恢复移动腿；wg 脚本只改目的端口。CGNAT 映射僵死是根据两端抓包和恢复行为的推断，运营商内部状态无法直接观测；用户决定不加源端口轮换。
+- flushdns 后恢复不能证明所有历史泄露来自 AR。工作机现只有 OxiDNS，DHCP 仍有备用 AR，分别核验。
+- 共享目录的脚本和候选配置需要与实时配置、Git 和日志对照，不能当作实施记录。

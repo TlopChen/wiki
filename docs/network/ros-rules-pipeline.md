@@ -62,7 +62,7 @@ scripts/
 
 ## 手工改动的即时生效
 
-网页改完 `input/manual/` 下的清单后，走"按需"两步，**不制定时、不做哈希**：
+广州已启用 manual-watch：每分钟检测六个手工输入，覆盖远端提交与本地编辑，变化命中才生成发布，无变化静默。上游仍日更，不监控 sources.json。ROS 不轮询、不做哈希。网页改清单可等下一分钟生成发布，也可显式执行：
 
 ```text
 # 1) 广州：只重生成手工相关产物，不拉上游
@@ -77,7 +77,7 @@ scripts/
 
 ROS 的 `manual-refresh` = 跑一次 `ros-rules-sync`（一次拉齐六张地址表 + OxiDNS 三份规则）+ 重启容器立即重载。
 
-**OxiDNS 已改成只读本地文件**：它的 `rules_download` 已从任务链摘除，只保留每天 07:00 的 `rules_reload`。
+**OxiDNS 已改成只读本地文件**：它的 `rules_download` 任务调用与插件定义均已删除，只保留每天 07:00 的 `rules_reload`。
 容器启动与重载都不再需要网络，隧道或镜像不可用也不影响它；规则新鲜度由 ROS 侧拉取决定
 （06:30 放好文件 → 07:00 本地 reload 生效，没有中断）。重启容器只是为了让手工改动立即生效，
 代价是约 1–8 秒 DNS 不可用。
@@ -94,13 +94,15 @@ ROS 的 `manual-refresh` = 跑一次 `ros-rules-sync`（一次拉齐六张地址
 | 需求 | 操作 |
 |---|---|
 | 某域名强制走代理 | 改 `input/manual/manual-blacklist.txt` |
-| 某域名改走直连 | 改 `input/manual/exclude-blacklist.txt` |
+| 某域名改走直连 | 从代理源排除并确认进入国内表；只改 exclude 仍可能命中非国内 → JP |
 | 国内域名表补充 | 改 `input/manual/manual-cn-domains.txt`（`domain:` / `full:` 前缀） |
 | 增加/更换域名源 | 改 `sources.json` 的 `tables.proxy-domain.sources`（引用写法 `owner/repo:path`，新仓库还要加进 `_infra/repos.json` 白名单） |
 | 增删被墙服务的 IP 段 | 改 `sources.json` 里 `blacklist` 的 `sources` / `extra_cidrs` |
 | 新增消费端格式 | 写适配器读 `output/proxy-domain.domains.txt`，产物加进 `_infra/publish.sh` |
 
-改完等次日 06:00 日更自动生效，或按上面的"手工改动即时生效"两步立即刷新。
+手工输入每分钟自动生成发布；sources.json 与上游仍等日更或全量生成。设备按 06:30 / 07:00 消费，立即生效执行 ROS 手动入口。
+
+06:15 direct-ip 全量日更保留，旧十分钟 DNS 刷新 cron 已注释。同步先下载校验，再逐表导入和替换文件；不是跨六表与三文件的整体事务，后续失败不会自动回滚已完成步骤。
 
 ## 验证
 

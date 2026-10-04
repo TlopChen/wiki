@@ -1,13 +1,13 @@
 # 双线出口与分流(BGP 黑洞通告 + AR 目的端口 PBR + mangle PBR)
 
-当前基线最后核验于 **2026-09-22**。机制沿革：SOCKS 中转 → BGP 黑洞通告 + mangle PBR → （2026-09-22）**两条 WG 隧道各自锁定电信/移动**。
+当前路由与宣告源核验于 **2026-10-04 22:01–22:03，北京时间**。机制沿革：SOCKS 中转 → BGP 黑洞通告 + mangle PBR → （2026-09-22）**两条 WG 隧道各自锁定电信/移动**。
 
 ## 一句话原理
 
 - AR6140 双 PPPoE（电信 `Dialer1` + 移动 `Dialer2`）做 NAT 出口
-- 家里 ROS 把 `CT` / `CM` / `blacklist` 三张地址表通过 BGP 通告给 AR
-- AR 按表精确选线：CT 资源 → 电信线、CM 资源 → 移动线、blacklist → 回送 ROS
-- ROS 把 blacklist 流量用 mangle PBR 按连接均分到**两条 WG 隧道**（`wg-ct` / `wg-cm`）
+- ROS 国内通道宣告 DIRECT_IP_NOCM / DIRECT_IP_NOCT，日本通道宣告 blacklist
+- AR 国内明细导向家宽；未命中明细时，优先级 50 的双默认路由指向日本隧道对端，经 ROS 递归可达
+- ROS 对 blacklist 和非 DIRECT_IP、非内部地址的 LAN 新连接做 PCC，均分到两条日本隧道
 - 两条隧道各用**一段独立的动态跳端口**，AR 在 x86 入口口上按目的端口段做策略路由，把它们分别锁到电信 / 移动出口
 
 ## 节点与角色
@@ -18,7 +18,7 @@
 | 家里 ROS | RouterOS 7.24 stable,`192.168.1.2`,AS 64523 | BGP 黑洞通告、mangle PBR、隧道端点 |
 | 日本节点 | Debian 13（2026-09-21 起，原 RouterOS CHR） | 两条隧道对端、公网出口、dnsmasq |
 
-内网 `Vlanif1 192.168.1.0/24`,主 DNS `192.168.1.2`;`XGE0/0/0 = 192.168.2.1/30` 是 PC 10G 口直连段。
+内网 `Vlanif1 192.168.1.0/24`,主 DNS `192.168.1.3`;`XGE0/0/0 = 192.168.2.1/30` 是 PC 10G 口直连段。
 
 ## BGP 设计
 
@@ -44,12 +44,12 @@
 - 内部可达性由 AR↔ROS 的 OSPFv2 Area 0 提供，接口使用点对点网络类型，只重分发 `192.168.0.0/16` 直连路由
 - 日本隧道公网端点保留双出口等价静态可达，避免隧道底座反向依赖隧道内路由
 - export 策略 `DENY_ALL` 纯接收
-- 默认路由 2 条静态 + `track nqa admin ct/cm` 做线路探测（15s 间隔、2 次失败撤线）
+- 优先缺省：0/0 → 192.168.20.2 / 192.168.30.2，preference 50，均 Active，RelayNextHop 均为 ROS。旧两条运营商缺省 preference 60，本轮 Inactive，保留原 NQA。优先隧道缺省未配置 NQA，OSPF 可达不能证明隧道或日本公网健康。
 
 ### ROS 侧
 
-- 单 BGP instance(lo)，`output.network=CT/CM/blacklist`（直接引用 address-list 名）+ `network-blackhole=yes`
-- `CT` / `CM` 表（约 3000 / 1500 条）与 `blacklist` 一起通告；两条日本通道都通告 blacklist → AR 收到同一网段的双 next-hop
+- lo-CT 的 output.network=DIRECT_IP_NOCM，lo-CM 为 DIRECT_IP_NOCT；日本通道仍为 blacklist。CT / CM 仍同步，不能再把它们的数量等同 BGP 收到前缀数。
+- 四会话均 Established：AR 国内收到 7646 / 6909，日本各 2455；ROS DIRECT_IP=6326，分表=7646 / 6909，与广州产物报告一致。数量随日更与动态注入变化。
 
 ## AR 目的端口 PBR（两条隧道各自锁线）
 
@@ -71,7 +71,7 @@ interface GigabitEthernet0/0/1 : traffic-policy p-lb2 inbound
 - 两条隧道因此**各锁一条家宽**：`wg-ct` 恒走电信、`wg-cm` 恒走移动（端口仍在段内跳，线路不变）
 - 代价：依赖 PPP 对端网关字面量，且**没有 backup**（见"已知弱点"）
 
-## mangle PBR（blacklist 流量均分到两条隧道）
+## mangle PBR（blacklist 与默认流量承接）
 
 ```text
 prerouting, in-interface=<LAN>, dst-address-list=blacklist, connection-state=new
@@ -81,7 +81,9 @@ prerouting, in-interface=<LAN>, dst-address-list=blacklist, connection-state=new
 → srcnat：出隧道前把源改写成 192.168.20.1 / 192.168.30.1
 ```
 
-分流粒度按连接均分（所有者决定），不按业务类型细分。
+blacklist PCC 后，另有两条 default-AR-WG 规则：LAN 入向、目的非本机、非 192.168.0.0/16、不在 DIRECT_IP 的新连接，同样按 2/0 与 2/1 打连接标记，再选 WG 表。它们承接 AR 默认流量，避免未经标记循 ROS main 缺省回 AR。ROS main 缺省仍为 AR，routing rule 当前为空。
+
+本轮核对配置与对端连通，未主动断线验证整体故障转移。
 
 ## 隧道故障转移
 
@@ -108,7 +110,7 @@ prerouting, in-interface=<LAN>, dst-address-list=blacklist, connection-state=new
 ## 已知弱点
 
 - **PBR 无失败回退**：目的端口 PBR 是写死的 `redirect ip-nexthop`，某条家宽故障或运营商重拨导致网关变化时，对应端口段（等于整条隧道）会黑洞，没有 backup。候选改法是给 traffic behavior 加 `backup-nexthop` + NQA track，但需先验证该 lan-board 是否支持
-- **BGP 首包收敛窗口**：DNS 联动即时写 list，但 AR 学到路由要等 BGP 传播，新域名首包可能短暂走错线
+- **首包机制已改变**：非 DIRECT_IP 的 LAN 新连接有默认 PCC 承接，降低对 blacklist 传播的依赖；国内表与 DNS 视图冲突、地址表同步时序仍需核对，不能声称所有首包问题已消除。
 - blacklist 里的大范围条目（如 `co.jp`）有误伤风险，排障见[坑与排障手册](pitfalls.md)
 
 ## 相关文档
