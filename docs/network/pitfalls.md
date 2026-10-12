@@ -79,3 +79,12 @@
 - 10-03 换源监听端口恢复移动腿；wg 脚本只改目的端口。CGNAT 映射僵死是根据两端抓包和恢复行为的推断，运营商内部状态无法直接观测；用户决定不加源端口轮换。
 - flushdns 后恢复不能证明所有历史泄露来自 AR。工作机现只有 OxiDNS，DHCP 仍有备用 AR，分别核验。
 - 共享目录的脚本和候选配置需要与实时配置、Git 和日志对照，不能当作实施记录。
+
+## Linux 侧服务与防火墙（2026-10-12）
+
+- **别把接口名写进服务配置**：`dnsmasq` 的 `interface=<名>` 配上 `bind-interfaces` 时，接口在启动那一刻不存在就直接 `unknown interface` 退出（exit 2）。而 systemd 的 `dnsmasq.service` 是 `Before=nss-lookup.target`、`wg-quick@.service` 是 `After=nss-lookup.target` —— **冷启动时 wg 接口必然晚于 DNS 服务**（实测只差约 100 ms）。该 unit 又是 `Restart=no`，失败即终态。正确姿势：服务只监听 `0.0.0.0`（通配＝本机所有地址），访问控制交给防火墙 ACL。
+- **环回口 ≠ 本机所有 IP**：绑 `127.0.0.1` 的 socket 只收目的地址为 `127.0.0.1` 的包，本机其它地址（隧道地址、公网地址）上的查询收不到。Linux 的"本地投递"指包会进本机协议栈，**由哪个 socket 接收仍由 bind 地址决定**。实测同一实例：打 `127.0.0.1` 有应答、打隧道地址超时；而通配实例对环回、隧道地址全部应答。
+- **注意 DNS 服务别只绑环回就以为"全都有"**：远程查询的目的地址是隧道地址，只绑环回必须再加一层 `dnat → 127.0.0.1`（还要 `route_localnet`），不如通配 + 防火墙直接。
+- **用客户端测 VPS 的 :53，测到的可能是自己家的 OxiDNS**：ROS 上有 `in-interface-list=LAN + dst-port=53 → 192.168.1.3:53` 的 dstnat，**没有目的地址限制**，所以从 LAN 打任何地址的 53 都会被转走。判别办法：查 AAAA（OxiDNS 对 AAAA 返回空应答，真实解析器会返回记录），或直接看 ROS 的 dstnat 命中计数。
+- **ACL 放防火墙，别放服务**：日本节点 nftables 入站 `policy drop` + 白名单（管理口、WireGuard 监听段、两条 wg 接口、必要 ICMP/ICMPv6），规则落在 `/etc/nftables.conf` 且 `nftables.service` enabled —— 这样服务监听 `0.0.0.0` 也不会暴露到公网（外部打 :53 无应答；若看到应答，多半是链路中间注入的假包，不是 VPS 答的）。
+- **网卡改名会让 `except-interface` 静默失效**：`except-interface=eth0` 这类按名字排除的写法，网卡一旦变成 `enpXsY` 就不再匹配；此时仍有防火墙与 `--local-service` 兜底，但要记得同步改配置。

@@ -31,9 +31,9 @@
 ## 日本节点（Debian 13，2026-09-21 起）
 
 - 系统：Debian 13，WireGuard 走 `wg-quick@wg-ct` / `wg-quick@wg-cm`（配置在 `/etc/wireguard/`）
-- 入口：nftables `ip nat prerouting` 把两条动态端口段分别 `redirect` 到各自的内部监听端口；`input` 默认 DROP，只放业务端口与 ICMP/ICMPv6
+- 入口：nftables `ip nat prerouting` 把两条动态端口段分别 `redirect` 到各自的内部监听端口；`input` 默认 DROP，只放行管理口、WireGuard 监听段、两条 wg 接口与必要 ICMP/ICMPv6 —— 2026-10-12 起 **DNS 的来源控制也由这层 ACL 承担**
 - 转发：`ip_forward=1`、出 `eth0` masquerade、双向 **MSS 自动钳制**（`set rt mtu`）
-- DNS：dnsmasq 同时 `interface=wg-ct` 与 `interface=wg-cm`，两条隧道各暴露一个上游地址供内网 OxiDNS 双活
+- DNS：dnsmasq 监听 `0.0.0.0`（本机所有地址，含环回），两条隧道各暴露一个上游地址供内网 OxiDNS 双活；**配置里不写 wg 接口名**，来源控制交给 nftables 入站 ACL（见[坑与排障手册](pitfalls.md)）
 - 保活：家里 ROS 的 `wg` 脚本每分钟改写**三条**隧道的 `endpoint-port`；两侧 peer `persistent-keepalive=25s`
 - 迁移前该角色由 RouterOS CHR 承担（单 `wg0` + SSTP），CHR 已退订、配置零残留
 
@@ -68,4 +68,9 @@
 
 ## 2026-10-04 补记
 
-三隧道握手在两分钟内，对端短测无丢包。10-03 移动腿故障时日本收到请求并回包、ROS 未收到；更换 ROS 源监听端口后恢复。源端口不参与 AR 目的端口 PBR；当前脚本只轮换目的入口端口，用户决定不增加源端口轮换。OxiDNS 移动腿竞速应答计数偏低仍需查，不能仅凭 ping 正常声称 DNS 冗余已长期验收。
+三隧道握手在两分钟内，对端短测无丢包。10-03 移动腿故障时日本收到请求并回包、ROS 未收到；更换 ROS 源监听端口后恢复。源端口不参与 AR 目的端口 PBR；当前脚本只轮换目的入口端口，用户决定不增加源端口轮换。
+
+## 2026-10-12 补记
+
+- **DNS 服务改为通配监听**：日本节点 dnsmasq 不再写死 `interface=wg-ct` / `interface=wg-cm`，改成监听 `0.0.0.0`（本机所有地址，含环回），排除公网口，来源控制交给 nftables 入站 ACL。原因是冷启动竞态：服务先于 wg 接口启动，`bind-interfaces` 遇到不存在的接口直接退出，境外解析全断 6.5 小时。详见[复盘](../blog/posts/jp-dnsmasq-boot-race.md)。
+- **源端口轮换已上线（更正 10-04 补记）**：三条隧道的**源（监听）端口**自 2026-10-08 起同样由 ROS 每分钟随机化（范围不公开），本页 10-04 那句"只轮换目的入口端口、不加源端口轮换"已过时。OxiDNS 移动腿竞速应答计数偏低仍需查，不能仅凭 ping 正常声称 DNS 冗余已长期验收。

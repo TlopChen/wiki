@@ -1,6 +1,6 @@
 # DNS 分流架构
 
-当前配置核验于 **2026-10-04 22:01–22:03，北京时间**。OxiDNS v1.6.0 运行在 ROS 容器中；主链采用互斥三段分流，缓存为纯内存，关闭负缓存。当前配置版本前缀为 `0c0ee0a4`。
+当前配置核验于 **2026-10-12 12:00–13:30，北京时间**。OxiDNS v1.6.1 运行在 ROS 容器中（2026-10-08 由离线镜像升级，镜像改走 CI 产物）；主链采用互斥三段分流，缓存为纯内存，关闭负缓存。当前配置版本前缀为 `0c0ee0a4`。
 
 ## 入口与完整链路
 
@@ -37,6 +37,7 @@ ROS 的 DNS 白名单当前仅 OxiDNS 地址启用，AR / ROS 两项为 disabled
 - OxiDNS：size=65536、max_positive_ttl=86400、lazy_cache_ttl=600、cache_negative=false，无 dump_file。重启后缓存清空。
 - 应答 TTL 归一为 60–86400 秒；ros_address_list 当前 fixed_ttl=86400，异步写 blacklist。生命周期由插件控制，不能套用 ROS 原生 DNS 的 address-list-extra-time。
 - AR 与日本 dnsmasq 仍各有缓存；日本 cache-size=10000。历史“全网只剩一层缓存”表述不准确。
+- 日本侧解析器（dnsmasq）：监听 `0.0.0.0`（本机所有地址，含环回，**不写 wg 接口名**），上游 8.8.8.8 / 1.1.1.1。来源控制分三层：nftables 入站默认 DROP、`except-interface=eth0`、systemd 包装脚本自带 `--local-service`。2026-10-12 之前它写死 `interface=wg-ct` / `interface=wg-cm` + `bind-interfaces`，冷启动竞态下会直接启动失败（见[复盘](../blog/posts/jp-dnsmasq-boot-race.md)）。
 
 上游没有应答时用 **SERVFAIL**，不能合成 NXDOMAIN，把故障伪装成域名不存在。`black_hole servfail` 曾通过 validate 但在 reload 初始化失败，实际可用的是 `reject 2`；每次变更必须核对 reload 成功、last_error=null、running 与 target 版本一致。
 
@@ -58,5 +59,7 @@ ROS 是唯一下载方：每日 06:30 同步六张地址表与 OxiDNS 三份规�
 - 10-01：拉取收口到 ROS，OxiDNS 只读本地规则。
 - 10-03：移动腿更换源端口恢复；删除下载插件残留；纯内存缓存并关闭负缓存；恢复 JP 双腿竞速。
 - 10-04：三段条件互斥，取消按 !has_resp 跨组回落，无应答改 SERVFAIL。
+- 10-08：OxiDNS 升到 v1.6.1（离线 tar 导入），镜像供应改为「CI 打包 → 广州分发 → ROS 按需升级」。
+- 10-12：日本 dnsmasq 改为通配监听、来源控制交给 nftables ACL；当日一次冷启动竞态导致的境外解析全断已复盘归档。
 
 见 [坑与排障手册](pitfalls.md) 与 [双线出口与分流](dual-wan-routing.md)。
