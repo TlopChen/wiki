@@ -1,6 +1,6 @@
 # DNS 分流架构
 
-当前配置核验于 **2026-11-11 19:47–20:05，日本时间**。OxiDNS **v1.7.0** 运行在 ROS 容器中（2026-11-11 由 CI 镜像升级；镜像 tar 需先把 `index.json` 扁平化为 image manifest 才能被 RouterOS 导入，该步骤已固化在 CI 里）；主链采用互斥三段分流，缓存为纯内存，关闭负缓存。当前配置版本前缀仍为 `0c0ee0a4`。
+当前配置核验于 **2026-11-12（升级后复核），日本时间**。OxiDNS **v1.7.1** 运行在 ROS 容器中（2026-11-12 由 CI 镜像升级，属 v1.7.0 的补丁版本，YAML 配置与规则直接沿用；镜像 tar 需先把 `index.json` 扁平化为 image manifest 才能被 RouterOS 导入，该步骤已固化在 CI 里，v1.7.1 同样适用）；主链采用互斥三段分流，缓存为纯内存，关闭负缓存。当前配置版本前缀仍为 `0c0ee0a4`。
 
 ## 入口与完整链路
 
@@ -35,6 +35,7 @@ ROS 的 DNS 白名单当前仅 OxiDNS 地址启用，AR / ROS 两项为 disabled
 - JP：日本隧道对端 `192.168.30.2` / `192.168.20.2`，`concurrent: 2`、`response_selection: fastest`。
 - CN：电信、移动、阿里、腾讯共六台上游并发竞速。
 - OxiDNS：size=65536、max_positive_ttl=86400、lazy_cache_ttl=600、cache_negative=false，无 dump_file。重启后缓存清空。
+- v1.7.1 起 DoH/H2/H3 上游响应体上限 65,535 字节（`Content-Length` 缺失或虚报也按实际读取逐块校验）；DNS 压缩指针解析改为每跳 O(1) 边界检查，拒绝前向指针与跨标签/指针循环，合法嵌套压缩后缀不变。超限响应与异常报文会被直接拒绝。
 - 应答 TTL 归一为 60–86400 秒；ros_address_list 当前 fixed_ttl=86400，异步写 blacklist。生命周期由插件控制，不能套用 ROS 原生 DNS 的 address-list-extra-time。
 - AR 与日本 dnsmasq 仍各有缓存；日本 cache-size=10000。历史“全网只剩一层缓存”表述不准确。
 - 日本侧解析器（dnsmasq）：监听 `0.0.0.0`（本机所有地址，含环回，**不写 wg 接口名**），上游 8.8.8.8 / 1.1.1.1。来源控制分三层：nftables 入站默认 DROP、`except-interface=eth0`、systemd 包装脚本自带 `--local-service`。2026-10-12 之前它写死 `interface=wg-ct` / `interface=wg-cm` + `bind-interfaces`，冷启动竞态下会直接启动失败（见[复盘](../blog/posts/jp-dnsmasq-boot-race.md)）。
@@ -62,5 +63,6 @@ ROS 是唯一下载方：每日 06:30 同步六张地址表与 OxiDNS 三份规�
 - 10-08：OxiDNS 升到 v1.6.1（离线 tar 导入），镜像供应改为「CI 打包 → 广州分发 → ROS 按需升级」。
 - 10-12：日本 dnsmasq 改为通配监听、来源控制交给 nftables ACL；当日一次冷启动竞态导致的境外解析全断已复盘归档。
 - 11-11：OxiDNS 升到 **v1.7.0**（升级前用临时容器 `oxidns check` 验证配置；CI 产物新增 `index.json` 扁平化步骤，否则 RouterOS 导入报 `no config found in manifest`），DNS 中断约 5 s，配置/规则/NAT/`/ip dns` 未变。
+- 11-12：OxiDNS 升到 **v1.7.1**（v1.7.0 的补丁版本：上游 DoH/H2/H3 响应体限 65,535 字节、DNS 压缩指针改 O(1) 边界检查并拒绝前向/循环指针、Unix 配置保存遇单文件挂载 EBUSY 时校验文件身份后原地写入；本机配置在目录挂载卷，不涉及单文件挂载，配置免改），JST 20:00:37–20:00:49 完成升级（repull 自动重启与脚本 stop/start 各一次），DNS 中断约 2 s，配置/规则/NAT/`/ip dns` 未变。
 
 见 [坑与排障手册](pitfalls.md) 与 [双线出口与分流](dual-wan-routing.md)。
